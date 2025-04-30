@@ -8,9 +8,12 @@
 /x86/
 /x64/
 .vs/
+vs/
 .vscode/
 .DS_Store
 *.exe
+*.bmp
+*.png
 *.zip
 *.user
 *.sdf
@@ -30,3 +33,4 @@ out/
 /build_xcode/
 /cmake-gen.bat
 /line-ending-check.bat
+.cache

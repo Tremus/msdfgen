@@ -1,0 +1,6 @@
+[submodule "modules/freetype"]
+	path = modules/freetype
+	url = https://github.com/freetype/freetype
+[submodule "modules/xhl"]
+	path = modules/xhl
+	url = https://github.com/Tremus/xhl
