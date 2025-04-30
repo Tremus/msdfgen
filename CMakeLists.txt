@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.15)
 project(msdfgen)
 set(CMAKE_C_STANDARD 99)
 
+if (APPLE)
+    enable_language(OBJC)
+endif()
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     add_compile_options(
         -Wno-deprecated-declarations
@@ -52,25 +56,42 @@ set(FREETYPE_SRC
     modules/freetype/src/truetype/truetype.c
     modules/freetype/src/sfnt/sfnt.c
     )
-if (WIN32)
-    list(APPEND FREETYPE_SRC
-    modules/freetype/builds/windows/ftdebug.c
-    modules/freetype/builds/windows/ftsystem.c)
-endif()
-add_library(freetype2 STATIC ${FREETYPE_SRC})
-target_include_directories(freetype2 PRIVATE
-    modules/freetype/include
-    )
-target_compile_definitions(freetype2 PRIVATE
+
+set(FREETYPE_DEFINES
     FT_CONFIG_CONFIG_H=<freetype/config/ftconfig.h>
     FT_CONFIG_OPTIONS_H=<freetype/config/ftoption.h>
     FT_CONFIG_STANDARD_LIBRARY_H=<freetype/config/ftstdlib.h>
     FT_CONFIG_MODULES_H=<freetype/config/ftmodule.h>
     FT_BEGIN_HEADER=;
     FT_END_HEADER=;
-    _CRT_SECURE_NO_WARNINGS
     FT2_BUILD_LIBRARY
+)
+if (WIN32)
+    list(APPEND FREETYPE_SRC
+        modules/freetype/builds/windows/ftdebug.c
+        modules/freetype/builds/windows/ftsystem.c
+        )
+    list(APPEND FREETYPE_DEFINES
+        _CRT_SECURE_NO_WARNINGS
+        )
+elseif(APPLE)
+    list(APPEND FREETYPE_SRC
+        modules/freetype/builds/mac/ftmac.c
+        modules/freetype/src/base/ftdebug.c
+        modules/freetype/builds/unix/ftsystem.c
+        )
+    list(APPEND FREETYPE_DEFINES
+        HAVE_FCNTL_H
+        HAVE_UNISTD_H
+        )
+endif()
+
+add_library(freetype2 STATIC ${FREETYPE_SRC})
+
+target_include_directories(freetype2 PRIVATE
+    modules/freetype/include
     )
+target_compile_definitions(freetype2 PRIVATE ${FREETYPE_DEFINES})
 
 set(MSDFGEN_SRC
     core/contour-combiners.cpp
@@ -102,8 +123,12 @@ set(MSDFGEN_SRC
     # main.cpp
     example.cpp
 )
+set(MSDFGEN_LIBS "freetype2")
 if (WIN32)
     list(APPEND MSDFGEN_SRC xhl_win.c)
+elseif(APPLE)
+    list(APPEND MSDFGEN_SRC xhl_mac.m)
+    list(APPEND MSDFGEN_LIBS "-framework AppKit")
 endif()
 add_executable(msdfgen ${MSDFGEN_SRC})
 target_compile_definitions(msdfgen PRIVATE
@@ -119,4 +144,4 @@ target_include_directories(msdfgen PRIVATE
     modules/freetype/include
     modules/xhl/include
     )
-target_link_libraries(msdfgen PRIVATE freetype2)
+target_link_libraries(msdfgen PRIVATE ${MSDFGEN_LIBS})

@@ -26,7 +26,13 @@ int main()
     ft = initializeFreetype();
     xassert(ft);
 
-    font = loadFont(ft, "C:\\Windows\\Fonts\\arialbd.ttf");
+#if defined(_WIN32)
+    static const char* fontpath = "C:\\Windows\\Fonts\\arialbd.ttf";
+#elif defined(__APPLE__)
+    static const char* fontpath = "/Library/Fonts/Arial Unicode.ttf";
+#endif
+
+    font = loadFont(ft, fontpath);
     xassert(font);
 
     static const char* latin =
