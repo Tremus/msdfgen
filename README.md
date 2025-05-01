@@ -13,6 +13,21 @@ Initial thoughts at the time of writing:
 
 Some of these assumptions may prove to be incorrect as I continue to learn more.
 
+(Update)
+_The next day..._
+
+It turns out some clever people fixed the speed/build/interface problems years ago. Here are two good finds:
+
+- C version [msdf-c](https://github.com/Tremus/msdf_c)
+    
+    I've included my own fork here because it contains the benchmark I used, + fixes by [@garettbass](https://github.com/garettbass). 
+
+    This is a neat C99 single header library, ~1.4k locs. The Freetype dependency  was replaced by STB TrueType. It supports custom allocators.
+    Rendering the same glyphs with the same height takes only ~45ms on a single thread. Using a custom arena allocator only yielded a 1ms speedup. Glyphs are slightly smaller with this library, you request a height and it determines enough width to fit the glyph, preventing a lot of overdraw. For a height of 32px in the Arial Bold font, the largest allocation made by my arena was ~27kb for the character '@'.
+- OpenGL version [msdfgl](https://github.com/nyyManni/msdfgl). Parallel parts of the algorithm run on geometry shaders. This is blazing fast, but OpenGL only.
+
+    Unfortunately I don't use OpenGL. A clever person may be able to convert these shaders to compute shaders. I am not that clever. 
+
 # Multi-channel signed distance field generator
 
 This is a utility for generating signed distance fields from vector shapes and font glyphs,
