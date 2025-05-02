@@ -18,25 +18,25 @@ _The next day..._
 
 It turns out some clever people fixed the speed/build/interface problems years ago. Here are two good finds:
 
-- C version [msdf-c](https://github.com/Tremus/msdf_c)
-    
-    I've included my own fork here because it contains the benchmark I used, + fixes by [@garettbass](https://github.com/garettbass). 
+-   C version [msdf-c](https://github.com/Tremus/msdf_c)
 
-    This is a neat C99 single header library, ~1.4k locs. The Freetype dependency  was replaced by STB TrueType. It supports custom allocators.
+    I've included my own fork here because it contains the benchmark I used, + fixes by [@garettbass](https://github.com/garettbass).
+
+    This is a neat C99 single header library, ~1.4k locs. The Freetype dependency was replaced by STB TrueType. It supports custom allocators.
     Rendering the same glyphs with the same height takes only ~45ms on a single thread. Using a custom arena allocator only yielded a 1ms speedup. Glyphs are slightly smaller with this library, you request a height and it determines enough width to fit the glyph, preventing a lot of overdraw. For a height of 32px in the Arial Bold font, the largest allocation made by my arena was ~27kb for the character '@'.
-- OpenGL version [msdfgl](https://github.com/nyyManni/msdfgl). Parallel parts of the algorithm run on geometry shaders. This is blazing fast, but OpenGL only.
 
-    Unfortunately I don't use OpenGL. A clever person may be able to convert these shaders to compute shaders. I am not that clever. 
+-   OpenGL version [msdfgl](https://github.com/nyyManni/msdfgl). Parallel parts of the algorithm run on geometry shaders. This is blazing fast, but OpenGL only.
+
+    Unfortunately I don't use OpenGL. A clever person may be able to convert these shaders to compute shaders. I am not that clever.
 
 (Update)
 _The next day..._
 
-Upon further investigation, both the C and OpenGL version look like they use earlier verson of algorithm. The C version was first uploaded to GitHub around 2018, and the OpenGL version in 2019. The algorithm started to recieve some pretty good updates since 2019, which helped with rendering sharper text using smaller MSDF textures. To render a simple 'A' glyph with decent quality in the C version, you need to render a fairly big glyph (64x64, after padding is removed ends up being 91x91 for Arial Bold), while Chlumsky's new version generally needs only 32x32.
+Upon further investigation, both the C and OpenGL version look like they use earlier verson of algorithm. The C version was first uploaded to GitHub around 2018, and the OpenGL version in 2019. The algorithm started to recieve some pretty good updates since 2019, which helped with rendering sharper text using smaller MSDF textures. To render a simple 'A' glyph with decent quality in the C version, you need to render a fairly big glyph, around 64x64 (padding will be removed), while Chlumsky's new version generally needs only 32x32. This is the difference between approx. 4kb & 16kb per glyph.
 
-The general rule of thumb with rendering quality in the latest algo is the more detailed & more points the source glyph has, the more artifacts the MSDF will contain at lower resolutions. 32x32 is acceptable for a simple font like Arial Bold. Characters like 'g' and '@' in Arial Bold still have noticible artifacts when the character is scaled very large, however if it's rendered at an ordinary reading size eg. 12-16px then these artifacts are likely unnoticeable. It may be possible to estiamte an ideal MSDF size by doing a simple count of the number of points in a glyph.
+The general rule of thumb with rendering quality in the latest algo is the more detailed & more points the source glyph has, the more artifacts the MSDF will contain at lower resolutions. 32x32 is acceptable for a simple font like Arial Bold. Complex characters like 'g' and '@' in Arial Bold are more likely to have noticible artifacts when the character is scaled very large, however if it's rendered at an ordinary reading size eg. 12-16px then these artifacts are likely unnoticeable. It may be possible to estiamte an ideal MSDF size by doing a simple count of the number of points in a glyph.
 
 By my estimation, Chlumsky's latest updates are too good to pass up, meaning the original C++ library will need some hacking. The old C version can serve as a good reference for final API design, as well integration with STBTT.
-
 
 # Multi-channel signed distance field generator
 
