@@ -119,9 +119,6 @@ set(MSDFGEN_SRC
     core/Shape.cpp
 
     ext/import-font.cpp
-
-    # main.cpp
-    example.cpp
 )
 set(MSDFGEN_LIBS "freetype2")
 if (WIN32)
@@ -130,8 +127,9 @@ elseif(APPLE)
     list(APPEND MSDFGEN_SRC xhl_mac.m)
     list(APPEND MSDFGEN_LIBS "-framework AppKit")
 endif()
-add_executable(msdfgen ${MSDFGEN_SRC})
-target_compile_definitions(msdfgen PRIVATE
+
+add_executable(msdfgen_cli main.cpp ${MSDFGEN_SRC})
+target_compile_definitions(msdfgen_cli PRIVATE
     MSDFGEN_PUBLIC=;
     MSDFGEN_STANDALONE
 
@@ -140,8 +138,25 @@ target_compile_definitions(msdfgen PRIVATE
     MSDFGEN_DISABLE_PNG
     MSDFGEN_DISABLE_VARIABLE_FONTS
     )
-target_include_directories(msdfgen PRIVATE
+target_include_directories(msdfgen_cli PRIVATE
     modules/freetype/include
     modules/xhl/include
     )
-target_link_libraries(msdfgen PRIVATE ${MSDFGEN_LIBS})
+target_link_libraries(msdfgen_cli PRIVATE ${MSDFGEN_LIBS})
+
+# benchmark
+add_executable(msdfgen_benchmark example.cpp ${MSDFGEN_SRC})
+target_compile_definitions(msdfgen_benchmark PRIVATE
+    MSDFGEN_PUBLIC=;
+    MSDFGEN_STANDALONE
+
+    MSDFGEN_EXTENSIONS
+    MSDFGEN_DISABLE_SVG
+    MSDFGEN_DISABLE_PNG
+    MSDFGEN_DISABLE_VARIABLE_FONTS
+    )
+target_include_directories(msdfgen_benchmark PRIVATE
+    modules/freetype/include
+    modules/xhl/include
+    )
+target_link_libraries(msdfgen_benchmark PRIVATE ${MSDFGEN_LIBS})

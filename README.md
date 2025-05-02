@@ -28,6 +28,16 @@ It turns out some clever people fixed the speed/build/interface problems years a
 
     Unfortunately I don't use OpenGL. A clever person may be able to convert these shaders to compute shaders. I am not that clever. 
 
+(Update)
+_The next day..._
+
+Upon further investigation, both the C and OpenGL version look like they use earlier verson of algorithm. The C version was first uploaded to GitHub around 2018, and the OpenGL version in 2019. The algorithm started to recieve some pretty good updates since 2019, which helped with rendering sharper text using smaller MSDF textures. To render a simple 'A' glyph with decent quality in the C version, you need to render a fairly big glyph (64x64, after padding is removed ends up being 91x91 for Arial Bold), while Chlumsky's new version generally needs only 32x32.
+
+The general rule of thumb with rendering quality in the latest algo is the more detailed & more points the source glyph has, the more artifacts the MSDF will contain at lower resolutions. 32x32 is acceptable for a simple font like Arial Bold. Characters like 'g' and '@' in Arial Bold still have noticible artifacts when the character is scaled very large, however if it's rendered at an ordinary reading size eg. 12-16px then these artifacts are likely unnoticeable. It may be possible to estiamte an ideal MSDF size by doing a simple count of the number of points in a glyph.
+
+By my estimation, Chlumsky's latest updates are too good to pass up, meaning the original C++ library will need some hacking. The old C version can serve as a good reference for final API design, as well integration with STBTT.
+
+
 # Multi-channel signed distance field generator
 
 This is a utility for generating signed distance fields from vector shapes and font glyphs,
