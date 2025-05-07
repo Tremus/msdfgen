@@ -1,0 +1,197 @@
+#include "msdfgen.h"
+
+#include "msdfgen-ext.h"
+
+#include "svpng.h"
+
+#include <stdio.h>
+#include <xhl/debug.h>
+#include <xhl/files.h>
+#include <xhl/time.h>
+
+#define ARRLEN(arr) (sizeof(arr) / sizeof(arr[0]))
+
+using namespace msdfgen;
+
+SDFTransformation autoframe_shape(Shape* shape, int width, int height)
+{
+    Shape::Bounds bounds = shape->getBounds();
+
+    const bool scaleSpecified = false;
+
+    Vector2 translate;
+    Vector2 scale    = 1;
+    double  avgScale = .5 * (scale.x + scale.y);
+
+    enum
+    {
+        RANGE_UNIT,
+        RANGE_PX
+    } rangeMode = RANGE_PX;
+    Range       range(1);
+    const Range pxRange(2);
+
+    // Auto-frame
+    double  l = bounds.l, b = bounds.b, r = bounds.r, t = bounds.t;
+    Vector2 frame(width, height);
+    if (!scaleSpecified)
+    {
+        if (rangeMode == RANGE_UNIT)
+            l += range.lower, b += range.lower, r -= range.lower, t -= range.lower;
+        else
+            frame += 2 * pxRange.lower;
+    }
+    if (l >= r || b >= t)
+        l = 0, b = 0, r = 1, t = 1;
+    if (frame.x <= 0 || frame.y <= 0)
+    {
+        // Cannot fit the specified pixel range!
+        xassert(false);
+    }
+    Vector2 dims(r - l, t - b);
+    if (scaleSpecified)
+        translate = .5 * (frame / scale - dims) - Vector2(l, b);
+    else
+    {
+        if (dims.x * frame.y < dims.y * frame.x)
+        {
+            translate.set(.5 * (frame.x / frame.y * dims.y - dims.x) - l, -b);
+            scale = avgScale = frame.y / dims.y;
+        }
+        else
+        {
+            translate.set(-l, .5 * (frame.y / frame.x * dims.x - dims.y) - b);
+            scale = avgScale = frame.x / dims.x;
+        }
+    }
+    if (rangeMode == RANGE_PX && !scaleSpecified)
+        translate -= pxRange.lower / scale;
+
+    if (rangeMode == RANGE_PX)
+        range = pxRange / min(scale.x, scale.y);
+
+    return SDFTransformation(Projection(scale, translate), range);
+}
+
+int main()
+{
+    xtime_init();
+
+    FreetypeHandle* ft   = NULL;
+    FontHandle*     font = NULL;
+    Shape           shape;
+    //          output width, height
+    Bitmap<float, 3>         glyph(32, 32);
+    Bitmap<unsigned char, 3> atlas(512, 512);
+    int                      atlas_x = 0;
+    int                      atlas_y = 0;
+
+    bool ok = false;
+
+    ft = initializeFreetype();
+    xassert(ft);
+
+#if defined(_WIN32)
+    static const char* fontpath = "C:\\Windows\\Fonts\\arialbd.ttf";
+#elif defined(__APPLE__)
+    static const char* fontpath = "/Library/Fonts/Arial Unicode.ttf";
+#endif
+
+    font = loadFont(ft, fontpath);
+    xassert(font);
+
+    static const char* latin =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890~`!@#$%^&*()-_=+,./<>?[]{}\\|;:'\"";
+    const size_t latin_len = strlen(latin);
+
+    uint64_t time_start = xtime_now_ns();
+    for (int i = 0; i < latin_len; i++)
+    {
+        int codepoint = latin[i];
+        // int codepoint = '@';
+        ok = loadGlyph(shape, font, codepoint, FONT_SCALING_NONE);
+        xassert(ok);
+
+        shape.normalize();
+        //                      max. angle
+        edgeColoringSimple(shape, 3.0);
+        //                            scale, translation (in em's)
+        const SDFTransformation transformation = autoframe_shape(&shape, glyph.width(), glyph.width());
+        generateMSDF(glyph, shape, transformation);
+        {
+            char   path[1024];
+            size_t path_len = 0;
+            memset(path, 0, sizeof(path));
+            xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
+            path_len = strlen(path);
+            xassert(path_len < sizeof(path));
+            snprintf(
+                path + path_len,
+                (sizeof(path) - path_len),
+                XFILES_DIR_STR "output" XFILES_DIR_STR "glyph_%d_%dx%d.bmp",
+                codepoint,
+                glyph.width(),
+                glyph.height());
+
+            bool ok = saveBmp(glyph, path);
+            xassert(ok);
+        }
+
+        for (int y = 0; y < glyph.height(); y++)
+        {
+            int glyph_y = glyph.height() - 1 - y;
+            xassert(glyph_y >= 0 && glyph_y < glyph.height());
+            xassert(atlas_y + y <= atlas.height());
+            for (int x = 0; x < glyph.width(); x++)
+            {
+                xassert(atlas_x + x <= atlas.width());
+                float* src           = glyph;
+                size_t glyph_offset  = glyph_y * glyph.width() + x;
+                glyph_offset        *= 3; // RGB channels
+                src                 += glyph_offset;
+
+                unsigned char* dst           = atlas;
+                size_t         atlas_offset  = (atlas_y + y) * atlas.width() + atlas_x + x;
+                atlas_offset                *= 3; // RGB channels
+                dst                         += atlas_offset;
+
+                // float > byte
+                dst[0] = pixelFloatToByte(src[0]);
+                dst[1] = pixelFloatToByte(src[1]);
+                dst[2] = pixelFloatToByte(src[2]);
+            }
+        }
+
+        atlas_x += glyph.width();
+        if (atlas_x >= atlas.width())
+        {
+            atlas_x  = 0;
+            atlas_y += glyph.height();
+        }
+    }
+
+    char   path[1024];
+    size_t path_len = 0;
+    memset(path, 0, sizeof(path));
+    xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
+    path_len = strlen(path);
+    xassert(path_len < sizeof(path));
+    snprintf(
+        path + path_len,
+        (sizeof(path) - path_len),
+        XFILES_DIR_STR "output" XFILES_DIR_STR "atlas_%dx%d.png",
+        atlas.width(),
+        atlas.height());
+
+    FILE* fp = fopen(path, "wb");
+    svpng(fp, atlas.width(), atlas.height(), atlas, 0);
+    fclose(fp);
+
+    uint64_t time_end = xtime_now_ns();
+    double   time_ms  = xtime_convert_ns_to_ms(time_end - time_start);
+    fprintf(stderr, "Built %zu glyphs in %.2lfms", latin_len, time_ms);
+
+    destroyFont(font);
+    deinitializeFreetype(ft);
+    return 0;
+}

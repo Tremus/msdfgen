@@ -121,6 +121,15 @@ set(MSDFGEN_SRC
     ext/import-font.cpp
 )
 set(MSDFGEN_LIBS "freetype2")
+set(MSDFGEN_DEFINITIONS
+    MSDFGEN_PUBLIC=;
+    MSDFGEN_STANDALONE
+
+    MSDFGEN_EXTENSIONS
+    MSDFGEN_DISABLE_SVG
+    MSDFGEN_DISABLE_PNG
+    MSDFGEN_DISABLE_VARIABLE_FONTS
+)
 if (WIN32)
     list(APPEND MSDFGEN_SRC xhl_win.c)
 elseif(APPLE)
@@ -129,15 +138,7 @@ elseif(APPLE)
 endif()
 
 add_executable(msdfgen_cli main.cpp ${MSDFGEN_SRC})
-target_compile_definitions(msdfgen_cli PRIVATE
-    MSDFGEN_PUBLIC=;
-    MSDFGEN_STANDALONE
-
-    MSDFGEN_EXTENSIONS
-    MSDFGEN_DISABLE_SVG
-    MSDFGEN_DISABLE_PNG
-    MSDFGEN_DISABLE_VARIABLE_FONTS
-    )
+target_compile_definitions(msdfgen_cli PRIVATE ${MSDFGEN_DEFINITIONS})
 target_include_directories(msdfgen_cli PRIVATE
     modules/freetype/include
     modules/xhl/include
@@ -146,17 +147,18 @@ target_link_libraries(msdfgen_cli PRIVATE ${MSDFGEN_LIBS})
 
 # benchmark
 add_executable(msdfgen_benchmark example.cpp ${MSDFGEN_SRC})
-target_compile_definitions(msdfgen_benchmark PRIVATE
-    MSDFGEN_PUBLIC=;
-    MSDFGEN_STANDALONE
-
-    MSDFGEN_EXTENSIONS
-    MSDFGEN_DISABLE_SVG
-    MSDFGEN_DISABLE_PNG
-    MSDFGEN_DISABLE_VARIABLE_FONTS
-    )
+target_compile_definitions(msdfgen_benchmark PRIVATE ${MSDFGEN_DEFINITIONS})
 target_include_directories(msdfgen_benchmark PRIVATE
     modules/freetype/include
     modules/xhl/include
     )
 target_link_libraries(msdfgen_benchmark PRIVATE ${MSDFGEN_LIBS})
+
+# build atlas
+add_executable(msdfgen_atlas atlas.cpp ${MSDFGEN_SRC})
+target_compile_definitions(msdfgen_atlas PRIVATE ${MSDFGEN_DEFINITIONS})
+target_include_directories(msdfgen_atlas PRIVATE
+    modules/freetype/include
+    modules/xhl/include
+    )
+target_link_libraries(msdfgen_atlas PRIVATE ${MSDFGEN_LIBS})
