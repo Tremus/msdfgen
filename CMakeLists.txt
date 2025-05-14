@@ -162,3 +162,47 @@ target_include_directories(msdfgen_atlas PRIVATE
     modules/xhl/include
     )
 target_link_libraries(msdfgen_atlas PRIVATE ${MSDFGEN_LIBS})
+
+# Build HarfBuzz
+add_library(harfbuzz STATIC modules/harfbuzz/src/harfbuzz.cc) # unity build
+target_compile_definitions(harfbuzz PRIVATE HAVE_FREETYPE HB_NO_PRAGMA_GCC_DIAGNOSTIC_WARNING ${MSDFGEN_DEFINITIONS})
+target_link_libraries(harfbuzz PRIVATE freetype2)
+target_include_directories(harfbuzz PRIVATE modules/freetype/include)
+
+# SheenBidi
+add_library(SheenBidi STATIC modules/SheenBidi/Source/SheenBidi.c) # unity build
+target_include_directories(SheenBidi PRIVATE modules/SheenBidi/Headers)
+target_compile_definitions(SheenBidi PRIVATE SB_CONFIG_UNITY)
+
+# libraqm
+add_library(raqm STATIC modules/libraqm/src/raqm.c)
+target_compile_definitions(raqm PRIVATE RAQM_SHEENBIDI)
+target_include_directories(raqm PRIVATE
+    modules/libraqm/src
+    modules/SheenBidi/Headers
+    modules/harfbuzz/src
+    modules/freetype/include
+    ${PROJECT_SOURCE_DIR}
+    )
+
+# Freetype test
+add_executable(freetype_test freetype_test.c)
+target_compile_definitions(freetype_test PRIVATE ${MSDFGEN_DEFINITIONS})
+target_include_directories(freetype_test PRIVATE
+    modules/freetype/include
+    modules/xhl/include
+    modules/harfbuzz/src
+    )
+target_link_libraries(freetype_test PRIVATE harfbuzz)
+
+# raqm test
+add_executable(raqm_test raqm_test.c)
+target_include_directories(raqm_test PRIVATE
+    modules/xhl/include
+    modules/libraqm/src
+    modules/SheenBidi/Headers
+    modules/harfbuzz/src
+    modules/freetype/include
+    ${PROJECT_SOURCE_DIR}
+    )
+target_link_libraries(raqm_test PRIVATE harfbuzz raqm SheenBidi)

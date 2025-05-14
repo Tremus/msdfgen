@@ -4,3 +4,12 @@
 [submodule "modules/xhl"]
 	path = modules/xhl
 	url = https://github.com/Tremus/xhl
+[submodule "modules/harfbuzz"]
+	path = modules/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz
+[submodule "modules/libraqm"]
+	path = modules/libraqm
+	url = https://github.com/host-oman/libraqm
+[submodule "modules/SheenBidi"]
+	path = modules/SheenBidi
+	url = https://github.com/Tehreer/SheenBidi
