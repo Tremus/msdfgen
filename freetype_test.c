@@ -1,7 +1,17 @@
+#define XHL_ALLOC_IMPL
+#define XHL_TIME_IMPL
+#define XHL_FILES_IMPL
+
 #include <ft2build.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <xhl/alloc.h>
 #include <xhl/debug.h>
+#include <xhl/files.h>
+#include <xhl/time.h>
+
+#include "svpng.h"
 
 #include FT_FREETYPE_H
 
@@ -10,10 +20,12 @@
 #include <hb-ft.h>
 
 #define println_impl(fmt, ...) fprintf(stderr, fmt "%s", __VA_ARGS__)
-#define println(...) println_impl(__VA_ARGS__, "\n")
+#define println(...)           println_impl(__VA_ARGS__, "\n")
 
 int main()
 {
+    xtime_init();
+    xalloc_init();
     println("Hello world");
 
     FT_Library library     = 0;
@@ -71,31 +83,50 @@ int main()
         hb_position_t  x_advance = pos->x_advance;
         hb_position_t  y_advance = pos->y_advance;
 
-        char glyphname[32];
-        // hb_bool_t ok = hb_font_get_glyph_name(font, glyphid, glyphname, sizeof(glyphname));
-        // xassert(ok);
-
-        // int err = FT_Get_Glyph_Name(face, info->codepoint, glyphname, sizeof(glyphname));
-        // xassert(err == 0);
-
-        // hb_font_get_glyph()
-
-        float pos_x  = (float)cursor_x / 64;
-        float pos_y  = (float)cursor_y / 64;
-        pos_x       -= (float)pos->x_offset / 64;
-        pos_y       -= (float)pos->y_offset / 64;
-
-        // face->charmap.
+        float pos_x = (float)(cursor_x + pos->x_offset) / (float)64;
+        float pos_y = (float)(cursor_y + pos->y_offset) / (float)64;
 
         println("Render glyph %d at %.2fx%.2f", glyphid, pos_x, pos_y);
-        /* draw_glyph(glyphid, cursor_x + x_offset, cursor_y + y_offset); */
 
         // Note: In Harfbuzz, after text has been 'shaped', info->codepoint will be set to the FreeType glyph index AKA
-        // char index eg: FT_UInt charindex = FT_Get_Char_Index(face, my_text[i]); xassert(charindex ==
-        // info->codepoint);
+        // char index.
+        // eg: FT_UInt charindex = FT_Get_Char_Index(face, my_text[i]); xassert(charindex == info->codepoint);
         int err = FT_Load_Glyph(face, glyphid, FT_LOAD_DEFAULT);
         xassert(err == 0);
-        // FT_Render_Glyph()
+        FT_Render_Mode render_mode = FT_RENDER_MODE_LCD; // subpixel antialiasing, horizontal screen
+        FT_Render_Glyph(face->glyph, render_mode);
+
+        const FT_Bitmap* bmp = &face->glyph->bitmap;
+        xassert(bmp->pixel_mode == FT_PIXEL_MODE_LCD);
+        xassert((bmp->width % 3) == 0);
+
+        unsigned char* img_data = xcalloc(1, bmp->width * bmp->rows);
+        for (int i = 0; i < bmp->rows; i++)
+        {
+            unsigned char* src = bmp->buffer + i * bmp->pitch;
+            unsigned char* dst = img_data + i * bmp->width;
+            memcpy(dst, src, bmp->width);
+        }
+
+        char   path[1024];
+        size_t path_len = 0;
+        memset(path, 0, sizeof(path));
+        xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
+        path_len = strlen(path);
+        xassert(path_len < sizeof(path));
+        snprintf(
+            path + path_len,
+            (sizeof(path) - path_len),
+            XFILES_DIR_STR "ft_glyph" XFILES_DIR_STR "glyph_%u_%dx%d.png",
+            glyphid,
+            bmp->width,
+            bmp->rows);
+
+        FILE* fp = fopen(path, "wb");
+        svpng(fp, bmp->width / 3, bmp->rows, img_data, 0);
+        fclose(fp);
+
+        xfree(img_data);
 
         cursor_x += x_advance;
         cursor_y += y_advance;
@@ -108,5 +139,7 @@ int main()
     xassert(!error);
     error = FT_Done_FreeType(library);
     xassert(!error);
+
+    xalloc_shutdown();
     return 0;
 }
