@@ -9,7 +9,8 @@
 
 #include <hb-ft.h>
 
-#define println(fmt, ...) fprintf(stderr, fmt "\n", __VA_ARGS__)
+#define println_impl(fmt, ...) fprintf(stderr, fmt "%s", __VA_ARGS__)
+#define println(...) println_impl(__VA_ARGS__, "\n")
 
 int main()
 {
