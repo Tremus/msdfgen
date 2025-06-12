@@ -55,7 +55,8 @@ int main()
     // xassert(default_language != NULL);
     // hb_buffer_set_language(buf, default_language);
 
-    const char* my_text     = "Sphinx of black quartz, judge my vow";
+    // const char* my_text     = "Sphinx of black quartz, judge my vow";
+    const char* my_text     = "AV. .W.V.";
     size_t      my_text_len = strlen(my_text);
     // xassert(my_text_len == 3);
     hb_buffer_add_utf8(buf, my_text, my_text_len, 0, my_text_len);
@@ -91,8 +92,10 @@ int main()
     const int      LABEL_ROW_STRIDE = LABEL_WIDTH * 3;
     unsigned char* label            = calloc(1, LABEL_HEIGHT * LABEL_ROW_STRIDE);
 
+    // Set pen position
+    // https://freetype.org/freetype2/docs/tutorial/step2.html#section-1
     pen_x = 0;
-    pen_y = 0;
+    pen_y = max_font_height_pixels + (face->size->metrics.descender >> 6);
 
     for (unsigned int i = 0; i < glyph_count; i++)
     {
@@ -125,21 +128,34 @@ int main()
         // Note all glyphs have height/rows... (spaces?)
         if (bmp->width && bmp->rows)
         {
-            int left = face->glyph->bitmap_left;
-            int top  = face->glyph->bitmap_top;
-            int x    = pen_x;
-            xassert(x < LABEL_WIDTH);
-            x *= 3;
-            xassert(x + bmp->width <= LABEL_ROW_STRIDE);
+            const int BMP_PEN_OFFSET_X = face->glyph->bitmap_left;
+            const int BMP_PEN_OFFSET_Y = face->glyph->bitmap_top;
 
-            // TODO: learn freetype kerning and properly offset drawn glyph on y axis
-            // https://freetype.org/freetype2/docs/tutorial/step2.html#section-5
+            int label_offset_x = pen_x + BMP_PEN_OFFSET_X;
+
+            xassert(label_offset_x >= 0 && label_offset_x < LABEL_WIDTH);
+            if (label_offset_x < 0)
+            {
+                pen_x          += abs(label_offset_x);
+                label_offset_x  = 0;
+            }
+            label_offset_x *= 3;
+            xassert(label_offset_x + bmp->width <= LABEL_ROW_STRIDE);
 
             for (int y = 0; y < bmp->rows; y++)
             {
-                unsigned char* dst = label + y * LABEL_ROW_STRIDE + x;
+                int label_offset_y = y + pen_y - BMP_PEN_OFFSET_Y;
+                xassert(label_offset_y >= 0 && label_offset_y < LABEL_HEIGHT);
+
+                unsigned char* dst = label + label_offset_y * LABEL_ROW_STRIDE + label_offset_x;
                 unsigned char* src = bmp->buffer + y * bmp->pitch;
-                memcpy(dst, src, bmp->width);
+
+                // memcpy(dst, src, bmp->width); // BAD!
+                for (int j = 0; j < bmp->width; j++)
+                {
+                    // Bitwise OR is important. Some glyphs overlap eg "W.V"
+                    dst[j] |= src[j];
+                }
             }
 
             // Save bitmap
