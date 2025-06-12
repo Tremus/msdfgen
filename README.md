@@ -38,6 +38,18 @@ The general rule of thumb with rendering quality in the latest algo is the more 
 
 By my estimation, Chlumsky's latest updates are too good to pass up, meaning the original C++ library will need some hacking. The old C version can serve as a good reference for final API design, as well integration with STBTT.
 
+(Update)
+_The next month..._
+
+After learning more about Freetype and going down the HarfBuzz rabbit hole, I have become convinced these two libraries are a better solution for sharp small 2D multilingual text on Windows. Nothing else compares, which is a shame, because I hate both libraries. I will just have to suck it up. If you want text that looks as good as the text in Google Chrome, you either have to use the same technology that they do (freetype + harfbuzz) or spend years of research writing your own raster algorithms and learning the quirks of all the languages on earth. This is hard, and also why there isn't a great deal of competition (most alternatives only handle Latin, Cyrillic, or similar scripts. This may be fine for some projects).
+
+On the off chance someone finds this repo and is going down similar rabbit holes, consider all of these articles mandatory reading:
+
+-   Intro to why text is so hard: https://faultlore.com/blah/text-hates-you/
+-   Great tut on how fonts work: https://freetype.org/freetype2/docs/tutorial/index.html (Read the whole tutorial)
+-   What is HarfBuzz?: https://harfbuzz.github.io/what-is-harfbuzz.html (Read all the what/why sub articles)
+-   State of Text Rendering 2024: https://behdad.org/text2024/
+
 # Multi-channel signed distance field generator
 
 This is a utility for generating signed distance fields from vector shapes and font glyphs,
