@@ -41,8 +41,10 @@ int main()
 
     println("Found %ld glyphs", face->num_glyphs);
 
-#define FONT_SIZE 16
-    FT_Set_Char_Size(face, FONT_SIZE * 64, FONT_SIZE * 64, 0, 0);
+    // Note: a width of 0 will automatically set the width of the glyph based on height
+    const float FONT_SIZE = 16;
+    const float DPI       = 96;
+    FT_Set_Char_Size(face, 0, FONT_SIZE * 64, DPI, DPI);
 
     glyph_index = FT_Get_Char_Index(face, 'A');
     xassert(glyph_index != 0); // 0 if glyph not found
@@ -53,9 +55,9 @@ int main()
     // xassert(default_language != NULL);
     // hb_buffer_set_language(buf, default_language);
 
-    const char* my_text     = "ABC";
+    const char* my_text     = "Sphinx of black quartz, judge my vow";
     size_t      my_text_len = strlen(my_text);
-    xassert(my_text_len == 3);
+    // xassert(my_text_len == 3);
     hb_buffer_add_utf8(buf, my_text, my_text_len, 0, my_text_len);
     hb_buffer_guess_segment_properties(buf);
     // hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
@@ -68,10 +70,30 @@ int main()
     unsigned int         glyph_count;
     hb_glyph_info_t*     glyph_info = hb_buffer_get_glyph_infos(buf, &glyph_count);
     hb_glyph_position_t* glyph_pos  = hb_buffer_get_glyph_positions(buf, &glyph_count);
-    xassert(glyph_count == 3);
+    // xassert(glyph_count == 3);
 
-    hb_position_t cursor_x = 0;
-    hb_position_t cursor_y = 0;
+    hb_position_t pen_x = 0;
+    hb_position_t pen_y = 0;
+
+    int max_font_height_pixels = (face->size->metrics.ascender - face->size->metrics.descender) >> 6;
+    for (unsigned int i = 0; i < glyph_count; i++)
+    {
+        pen_x += glyph_pos[i].x_advance;
+        pen_y += glyph_pos[i].y_advance;
+    }
+
+    // const int      ATLAS_WIDTH            = 512;
+    // const int      ATLAS_HEIGHT           = 512;
+    // const int      ATLAS_ROW_STRIDE       = ATLAS_WIDTH * 3;
+    // unsigned char* atlas                  = calloc(1, ATLAS_HEIGHT * ATLAS_ROW_STRIDE);
+    const int      LABEL_WIDTH      = pen_x >> 6;
+    const int      LABEL_HEIGHT     = max_font_height_pixels;
+    const int      LABEL_ROW_STRIDE = LABEL_WIDTH * 3;
+    unsigned char* label            = calloc(1, LABEL_HEIGHT * LABEL_ROW_STRIDE);
+
+    pen_x = 0;
+    pen_y = 0;
+
     for (unsigned int i = 0; i < glyph_count; i++)
     {
         const hb_glyph_info_t*     info = glyph_info + i;
@@ -83,10 +105,10 @@ int main()
         hb_position_t  x_advance = pos->x_advance;
         hb_position_t  y_advance = pos->y_advance;
 
-        float pos_x = (float)(cursor_x + pos->x_offset) / (float)64;
-        float pos_y = (float)(cursor_y + pos->y_offset) / (float)64;
+        int pos_x = pen_x + (pos->x_offset >> 6);
+        int pos_y = pen_y + (pos->y_offset >> 6);
 
-        println("Render glyph %d at %.2fx%.2f", glyphid, pos_x, pos_y);
+        println("Render glyph %d at %dx%d", glyphid, pos_x, pos_y);
 
         // Note: In Harfbuzz, after text has been 'shaped', info->codepoint will be set to the FreeType glyph index AKA
         // char index.
@@ -98,39 +120,87 @@ int main()
 
         const FT_Bitmap* bmp = &face->glyph->bitmap;
         xassert(bmp->pixel_mode == FT_PIXEL_MODE_LCD);
-        xassert((bmp->width % 3) == 0);
+        xassert((bmp->width % 3) == 0); // note: FT width is measured in bytes (subpixels)
 
-        unsigned char* img_data = xcalloc(1, bmp->width * bmp->rows);
-        for (int i = 0; i < bmp->rows; i++)
+        // Note all glyphs have height/rows... (spaces?)
+        if (bmp->width && bmp->rows)
         {
-            unsigned char* src = bmp->buffer + i * bmp->pitch;
-            unsigned char* dst = img_data + i * bmp->width;
-            memcpy(dst, src, bmp->width);
+            int left = face->glyph->bitmap_left;
+            int top  = face->glyph->bitmap_top;
+            int x    = pen_x;
+            xassert(x < LABEL_WIDTH);
+            x *= 3;
+            xassert(x + bmp->width <= LABEL_ROW_STRIDE);
+
+            // TODO: learn freetype kerning and properly offset drawn glyph on y axis
+            // https://freetype.org/freetype2/docs/tutorial/step2.html#section-5
+
+            for (int y = 0; y < bmp->rows; y++)
+            {
+                unsigned char* dst = label + y * LABEL_ROW_STRIDE + x;
+                unsigned char* src = bmp->buffer + y * bmp->pitch;
+                memcpy(dst, src, bmp->width);
+            }
+
+            // Save bitmap
+            /*
+            {
+                unsigned char* img_data = xcalloc(1, bmp->width * bmp->rows);
+                for (int i = 0; i < bmp->rows; i++)
+                {
+                    unsigned char* src = bmp->buffer + i * bmp->pitch;
+                    unsigned char* dst = img_data + i * bmp->width;
+                    memcpy(dst, src, bmp->width);
+                }
+
+                char   path[1024];
+                size_t path_len = 0;
+                memset(path, 0, sizeof(path));
+                xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
+                path_len = strlen(path);
+                xassert(path_len < sizeof(path));
+                int width_pixels = bmp->width / 3;
+                snprintf(
+                    path + path_len,
+                    (sizeof(path) - path_len),
+                    XFILES_DIR_STR "ft_glyph" XFILES_DIR_STR "glyph_%u_%dx%d.png",
+                    glyphid,
+                    width_pixels,
+                    bmp->rows);
+
+                FILE* fp = fopen(path, "wb");
+                xassert(fp);
+                svpng(fp, width_pixels, bmp->rows, img_data, 0);
+                fclose(fp);
+
+                xfree(img_data);
+            }
+            */
         }
 
-        char   path[1024];
-        size_t path_len = 0;
-        memset(path, 0, sizeof(path));
-        xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
-        path_len = strlen(path);
-        xassert(path_len < sizeof(path));
-        snprintf(
-            path + path_len,
-            (sizeof(path) - path_len),
-            XFILES_DIR_STR "ft_glyph" XFILES_DIR_STR "glyph_%u_%dx%d.png",
-            glyphid,
-            bmp->width,
-            bmp->rows);
-
-        FILE* fp = fopen(path, "wb");
-        svpng(fp, bmp->width / 3, bmp->rows, img_data, 0);
-        fclose(fp);
-
-        xfree(img_data);
-
-        cursor_x += x_advance;
-        cursor_y += y_advance;
+        pen_x += x_advance >> 6;
+        pen_y += y_advance >> 6;
     }
+
+    char   path[1024];
+    size_t path_len = 0;
+    memset(path, 0, sizeof(path));
+    xfiles_get_user_directory(path, sizeof(path), XFILES_USER_DIRECTORY_DESKTOP);
+    path_len = strlen(path);
+    xassert(path_len < sizeof(path));
+    snprintf(
+        path + path_len,
+        (sizeof(path) - path_len),
+        XFILES_DIR_STR "ft_glyph" XFILES_DIR_STR "label_%dx%d.png",
+        LABEL_WIDTH,
+        LABEL_HEIGHT);
+
+    FILE* fp = fopen(path, "wb");
+    xassert(fp);
+    svpng(fp, LABEL_WIDTH, LABEL_HEIGHT, label, 0);
+    fclose(fp);
+
+    free(label);
 
     hb_buffer_destroy(buf);
     hb_font_destroy(font);
