@@ -193,6 +193,8 @@ target_include_directories(freetype_test PRIVATE
     modules/freetype/include
     modules/xhl/include
     modules/harfbuzz/src
+    modules/SheenBidi/Headers
+    modules/SheenBidi/Source
     )
 target_link_libraries(freetype_test PRIVATE harfbuzz)
 
